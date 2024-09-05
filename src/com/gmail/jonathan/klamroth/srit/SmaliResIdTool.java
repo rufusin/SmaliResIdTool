@@ -13,16 +13,20 @@ import java.util.regex.Pattern;
 
 
 /**
- * Created by jonny on 24.06.16.
+ * Created by jonny on 24.06.16, added by CaM/7oCe6e on 05.09.24
  */
 public class SmaliResIdTool {
 
-    private final Pattern RES_ID_COMMENT_PATTERN = Pattern.compile(".*# resource/[a-z]+: .*");
-    private final Pattern CONST_PATTERN = Pattern.compile(".*const +v[0-9]+, *0x([a-fA-F0-9]+).*");
-
     private final File mProjectDirFile;
-    private final String mLang;
 
+    private final Pattern CONST_PATTERN = Pattern.compile("^\\s{4}const +[vp][0-9]+, *0x([a-fA-F0-9]+).*");
+    private final Pattern RES_ID_COMMENT_PATTERN = Pattern.compile("^\\s{4}# resource/[a-z]+: .*");
+    // private final Pattern UNESCAPE_PATTERN = Pattern.compile("^\\s{4}const-string [vp]\\d+, \"(.+\\\\u.{4}.*)\"");
+    private final Pattern UNESCAPE_PATTERN = Pattern.compile("^\\s{4}const-string [vp]\\d+, \"(.+\\\\u\\w{4}.*)\"");
+
+    // private final String MARKER = "    # unicode: ";
+
+    private final String mLang;
     private final String mValuesDir;
 
 
@@ -114,6 +118,11 @@ public class SmaliResIdTool {
             @Override
             public void lineRead (String line) {
                 Matcher m = RES_ID_COMMENT_PATTERN.matcher(line);
+                Matcher matcherEscape = UNESCAPE_PATTERN.matcher(line);
+                if (line.startsWith("    # unicode: ")) {
+                    return;
+                }
+
                 if (m.matches()) {
                     mIgnoreLines = true;
                     return;
@@ -124,25 +133,28 @@ public class SmaliResIdTool {
                     int id = Integer.parseInt(m.group(1), 16);
                     if (resources.containsKey(id)) {
                         Resource res = resources.get(id);
-                        sb.append("    # resource/").append(res.type).append(": ").append(res.name).append("\n");
+                        sb.append("    # resource/").append(res.type).append(": ").append(res.name).append(System.lineSeparator());
 
                         if (res.type.equals("string") && strings.containsKey(res.name))
-                            sb.append("    # ").append(strings.get(res.name).replace("\r", "\\r").replace("\n", "\\n")).append("\n");
+                            sb.append("    # ").append(strings.get(res.name).replace("\r", "\\r").replace("\n", "\\n")).append(System.lineSeparator());
                         else if (res.type.equals("integer") && integers.containsKey(res.name))
-                            sb.append("    # ").append(integers.get(res.name).replace("\r", "\\r").replace("\n", "\\n")).append("\n");
+                            sb.append("    # ").append(integers.get(res.name).replace("\r", "\\r").replace("\n", "\\n")).append(System.lineSeparator());
                         else if (res.type.equals("bool") && bools.containsKey(res.name))
-                            sb.append("    # ").append(bools.get(res.name).replace("\r", "\\r").replace("\n", "\\n")).append("\n");
+                            sb.append("    # ").append(bools.get(res.name).replace("\r", "\\r").replace("\n", "\\n")).append(System.lineSeparator());
                         else if (res.type.equals("color") && colors.containsKey(res.name))
-                            sb.append("    # ").append(colors.get(res.name).replace("\r", "\\r").replace("\n", "\\n")).append("\n");
+                            sb.append("    # ").append(colors.get(res.name).replace("\r", "\\r").replace("\n", "\\n")).append(System.lineSeparator());
                         else if (res.type.equals("dimen") && dimens.containsKey(res.name))
-                            sb.append("    # ").append(dimens.get(res.name).replace("\r", "\\r").replace("\n", "\\n")).append("\n");
+                            sb.append("    # ").append(dimens.get(res.name).replace("\r", "\\r").replace("\n", "\\n")).append(System.lineSeparator());
                     }
 
+                    mIgnoreLines = false;
+                } else if (matcherEscape.find()) {
+                    sb.append("    # unicode: ").append(Util.unescapeUnicode(matcherEscape.group(1))).append(System.lineSeparator());
                     mIgnoreLines = false;
                 }
 
                 if (!mIgnoreLines)
-                    sb.append(line).append("\n");
+                    sb.append(line).append(System.lineSeparator());
             }
         };
 
